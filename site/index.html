@@ -228,7 +228,8 @@ footer ul { margin: 0; padding-left: 18px; display: grid; gap: 2px; }
       "14": { y1: "2027-03-01", y3: "2029-03-01", end: "2030-02-28" },
       "15": { y1: "2028-03-01", y3: "2030-03-01", end: "2031-02-28" },
       "16": { y1: "2029-03-01", y3: "2031-03-01", end: "2032-02-29" },
-      "17": { y1: "2030-03-01", y3: "2032-03-01", end: "2033-02-28" }
+      "17": { y1: "2030-03-01", y3: "2032-03-01", end: "2033-02-28" },
+      "18": { y1: "2031-03-01", y3: "2033-03-01", end: "2034-02-28" }
     }},
     "aurora-pg": { label: "Aurora PostgreSQL", aurora: true, family: "pg", versions: {
       "11": { y1: "2024-04-01", y3: "2026-04-01", end: "2027-03-31" },
@@ -237,7 +238,8 @@ footer ul { margin: 0; padding-left: 18px; display: grid; gap: 2px; }
       "14": { y1: "2027-03-01", y3: "2029-03-01", end: "2030-02-28" },
       "15": { y1: "2028-03-01", y3: "2030-03-01", end: "2031-02-28" },
       "16": { y1: "2029-03-01", y3: "2031-03-01", end: "2032-02-29" },
-      "17": { y1: "2030-03-01", y3: "2032-03-01", end: "2033-02-28" }
+      "17": { y1: "2030-03-01", y3: "2032-03-01", end: "2033-02-28" },
+      "18": { y1: "2031-03-01", y3: "2033-03-01", end: "2034-02-28" }
     }},
     "rds-mysql": { label: "RDS for MySQL", aurora: false, family: "mysql", versions: {
       "5.7": { y1: "2024-03-01", y3: "2026-03-01", end: "2029-06-30" },
@@ -435,7 +437,7 @@ footer ul { margin: 0; padding-left: 18px; display: grid; gap: 2px; }
       "<b>Public schema.</b> PostgreSQL 15 removed CREATE on <code>public</code> for all users in new databases. Scripts that create objects there may fail in fresh environments.",
       "<b>Query plans.</b> The planner changes between major versions. Run your most frequent and most expensive queries on a restored snapshot of the new version and compare timings before you switch."
     ]},
-    "pg-new": { title: "PostgreSQL 15–17 → newer major", items: [
+    "pg-new": { title: "PostgreSQL 15–18 → newer major", items: [
       "<b>Extensions.</b> Update extensions to versions the target supports before you start.",
       "<b>Statistics.</b> Run <code>ANALYZE</code> after the upgrade unless the target is 18 or later.",
       "<b>Query plans.</b> Compare your top queries on a restored snapshot of the new version before you switch."

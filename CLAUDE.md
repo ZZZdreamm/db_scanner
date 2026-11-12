@@ -19,3 +19,8 @@ Two things in one repo, both aimed at teams paying AWS RDS/Aurora Extended Suppo
 - The tool must stay read-only. Never add AWS calls that modify resources.
 - Dates come from the AWS release calendars; rates are estimates and must be labelled as such.
 - Product direction: the next feature is the paid part, testing query plans and latency on a restored snapshot of the new version.
+
+## Repositories
+
+- `origin` is private and holds everything, including `lab/` (local upgrade labs, the paid part in the making).
+- `public` serves the calculator on GitHub Pages. Publish only with `scripts/publish-public.sh`, which strips `lab/`. Never `git push public`.

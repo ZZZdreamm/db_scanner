@@ -17,6 +17,8 @@ concurrency:
 
 jobs:
   deploy:
+    # Pages is published from the public repository only.
+    if: ${{ !github.event.repository.private }}
     runs-on: ubuntu-latest
     environment:
       name: github-pages
