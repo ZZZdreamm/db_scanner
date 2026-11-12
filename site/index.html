@@ -1,0 +1,501 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Estimate the AWS RDS and Aurora Extended Support charge for your PostgreSQL and MySQL databases, and see what to check before upgrading.">
+<title>RDS Extended Support Calculator</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: an operations worksheet. Fleet rows on the left, the bill on the right, upgrade notes below. */
+:root {
+  --bg: #f4f6f6;
+  --surface: #ffffff;
+  --ink: #15201f;
+  --muted: #5b6967;
+  --line: #d9e0df;
+  --field: #f8faf9;
+  --accent: #0f6b62;
+  --accent-soft: #e2f0ee;
+  --rate1: #d08a1a;
+  --rate3: #b4432a;
+  --ok: #2f7d4f;
+  --ok-soft: #e4f2e9;
+  --warn: #9a5b00;
+  --warn-soft: #fbefd9;
+  --crit: #a3331f;
+  --crit-soft: #f8e3de;
+  --font-ui: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --font-data: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1514; --surface: #172020; --ink: #e6eeec; --muted: #9aaba8; --line: #2b3837; --field: #121a19;
+    --accent: #5cc2b4; --accent-soft: #1c3431; --rate1: #e9a93f; --rate3: #e47156;
+    --ok: #6cc28d; --ok-soft: #1b3326; --warn: #e9a93f; --warn-soft: #36290f; --crit: #ef8a72; --crit-soft: #3d1f18;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1514; --surface: #172020; --ink: #e6eeec; --muted: #9aaba8; --line: #2b3837; --field: #121a19;
+  --accent: #5cc2b4; --accent-soft: #1c3431; --rate1: #e9a93f; --rate3: #e47156;
+  --ok: #6cc28d; --ok-soft: #1b3326; --warn: #e9a93f; --warn-soft: #36290f; --crit: #ef8a72; --crit-soft: #3d1f18;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--font-ui); font-size: 15px; line-height: 1.5;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 48px;
+}
+.wrap { max-width: 1180px; margin: 0 auto; display: grid; gap: 28px; }
+header { display: grid; gap: 8px; max-width: 760px; }
+.eyebrow { font-family: var(--font-data); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+h1 { font-size: clamp(26px, 4vw, 36px); line-height: 1.15; margin: 0; text-wrap: balance; font-weight: 700; }
+h2 { font-size: 18px; margin: 0; text-wrap: balance; }
+h3 { font-size: 15px; margin: 0; }
+p { margin: 0; }
+.lede { color: var(--muted); max-width: 65ch; }
+.grid { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 24px; align-items: start; }
+@media (max-width: 960px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 20px; display: grid; gap: 16px; min-width: 0; }
+.panel-head { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: baseline; justify-content: space-between; }
+.hint { font-size: 13px; color: var(--muted); }
+.rows { display: grid; gap: 12px; }
+.row { border: 1px solid var(--line); border-radius: 8px; padding: 14px; display: grid; gap: 12px; background: var(--field); }
+.row-fields { display: grid; grid-template-columns: 1.3fr 1.4fr .8fr 1.5fr; gap: 10px 12px; }
+.row-fields2 { display: grid; grid-template-columns: 1.3fr 1.4fr .8fr 1.5fr; gap: 10px 12px; }
+@media (max-width: 720px) { .row-fields, .row-fields2 { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 420px) { .row-fields, .row-fields2 { grid-template-columns: minmax(0, 1fr); } }
+label { display: grid; gap: 4px; font-size: 12px; color: var(--muted); font-weight: 500; min-width: 0; }
+input, select {
+  font: inherit; font-size: 14px; color: var(--ink); background: var(--surface); border: 1px solid var(--line);
+  border-radius: 6px; padding: 7px 9px; width: 100%; min-width: 0;
+}
+input[type="number"] { font-family: var(--font-data); }
+input:focus-visible, select:focus-visible, button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.row-foot { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; }
+.row-stats { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; font-size: 13px; color: var(--muted); }
+.row-stats b { color: var(--ink); font-family: var(--font-data); font-weight: 600; }
+.pill { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; padding: 2px 9px; border-radius: 999px; white-space: nowrap; }
+.pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.pill.ok { color: var(--ok); background: var(--ok-soft); }
+.pill.warn { color: var(--warn); background: var(--warn-soft); }
+.pill.crit { color: var(--crit); background: var(--crit-soft); }
+button { font: inherit; cursor: pointer; }
+.btn { border: 1px solid var(--accent); color: var(--accent); background: transparent; border-radius: 6px; padding: 7px 14px; font-weight: 600; font-size: 14px; }
+.btn:hover { background: var(--accent-soft); }
+.btn-quiet { border: none; background: transparent; color: var(--muted); font-size: 13px; padding: 4px 6px; text-decoration: underline; text-underline-offset: 3px; }
+.btn-quiet:hover { color: var(--crit); }
+.actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.summary { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 16px); }
+@media (max-width: 960px) { .summary { position: static; } }
+.big { display: grid; gap: 2px; }
+.big .label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; font-weight: 500; }
+.big .value { font-family: var(--font-data); font-size: 34px; font-weight: 600; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.big .sub { font-size: 13px; color: var(--muted); }
+.kv { display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; font-size: 14px; border-top: 1px solid var(--line); padding-top: 14px; }
+.kv dt { color: var(--muted); }
+.kv dd { margin: 0; font-family: var(--font-data); font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
+.chart-box { overflow-x: auto; }
+.chart-box svg { display: block; width: 100%; height: auto; min-width: 300px; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+.notes { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+.note { border: 1px solid var(--line); border-radius: 8px; padding: 16px; display: grid; gap: 10px; align-content: start; background: var(--surface); }
+.note .path { font-family: var(--font-data); font-size: 13px; color: var(--accent); }
+.note ul { margin: 0; padding-left: 18px; display: grid; gap: 6px; font-size: 14px; }
+.note code, .cmd code { font-family: var(--font-data); font-size: 12.5px; background: var(--accent-soft); padding: 1px 5px; border-radius: 4px; }
+.cta { display: grid; gap: 10px; border: 1px dashed var(--accent); border-radius: 10px; padding: 18px; background: var(--accent-soft); }
+.cmd { font-family: var(--font-data); font-size: 13px; overflow-x: auto; white-space: nowrap; }
+footer { font-size: 12.5px; color: var(--muted); display: grid; gap: 6px; max-width: 80ch; }
+footer a { color: var(--accent); }
+footer ul { margin: 0; padding-left: 18px; display: grid; gap: 2px; }
+.example-tag { font-family: var(--font-data); font-size: 11px; color: var(--muted); border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; }
+@media (prefers-reduced-motion: no-preference) { .big .value { transition: color .2s; } }
+</style>
+<style>.cta a{color:var(--accent)} :root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)} body{margin:0}</style>
+</head>
+<body>
+
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Amazon RDS &amp; Aurora · PostgreSQL &amp; MySQL</div>
+    <h1>How much will Extended Support cost your fleet?</h1>
+    <p class="lede">AWS bills Extended Support per vCPU-hour on every node of an out-of-date major version: primary, read replicas and Multi-AZ standbys. Add your databases below to see the monthly charge, how it grows in year three, and what to check before you upgrade.</p>
+  </header>
+
+  <div class="grid">
+    <section class="panel" aria-labelledby="fleet-h">
+      <div class="panel-head">
+        <h2 id="fleet-h">Your databases</h2>
+        <span class="hint" id="example-hint">The two rows below are examples. Edit or remove them.</span>
+      </div>
+      <div class="rows" id="rows"></div>
+      <div class="actions">
+        <button class="btn" id="add" type="button">Add a database</button>
+        <button class="btn-quiet" id="reset" type="button">Reset to examples</button>
+      </div>
+    </section>
+
+    <aside class="panel summary" aria-labelledby="bill-h">
+      <h2 id="bill-h">Your Extended Support bill</h2>
+      <div class="big">
+        <span class="label">Charged per month right now</span>
+        <span class="value" id="now">$0</span>
+        <span class="sub" id="now-sub"></span>
+      </div>
+      <dl class="kv">
+        <dt>Next 12 months</dt><dd id="next12">$0</dd>
+        <dt>Until Extended Support ends</dt><dd id="total">$0</dd>
+        <dt>vCPUs billed right now</dt><dd id="vcpus">0</dd>
+      </dl>
+      <div class="chart-box" id="chart" role="img" aria-label="Extended Support charges by calendar year"></div>
+      <div class="legend">
+        <span><i style="background: var(--rate1)"></i>Years 1–2 rate</span>
+        <span><i style="background: var(--rate3)"></i>Year 3+ rate (double)</span>
+      </div>
+      <p class="hint">Estimate for nodes running 24/7. Upgrading to a supported major version stops the charge.</p>
+    </aside>
+  </div>
+
+  <section class="panel" aria-labelledby="notes-h">
+    <div class="panel-head">
+      <h2 id="notes-h">What to check before you upgrade</h2>
+      <span class="hint">Based on the versions in your list</span>
+    </div>
+    <div class="notes" id="notes"></div>
+  </section>
+
+  <section class="cta" aria-labelledby="cta-h">
+    <h2 id="cta-h">Scan every account and region automatically</h2>
+    <p>A free, open-source, read-only CLI that lists every RDS and Aurora database on an end-of-life version, adds up the Extended Support charge and flags upgrade blockers. It runs on your machine with your own AWS credentials; nothing is sent anywhere.</p>
+    <div class="cmd"><code>pip install git+https://github.com/__REPO__.git &amp;&amp; eol-scan --all-regions</code></div>
+    <p><a href="https://github.com/__REPO__" target="_blank" rel="noopener">Source code on GitHub</a></p>
+  </section>
+
+  <footer>
+    <p>Dates come from the AWS release calendars. Year 1–2 and year 3 rates by region come from a third-party summary of the AWS price list (Europe (Frankfurt) checked against the official AWS Price List in November 2026); other regions may have changed, so confirm on the AWS pricing page for your engine before you quote a number. Aurora Serverless (billed per ACU-hour) and Reserved Instance discounts are not modelled.</p>
+    <ul>
+      <li><a href="https://docs.aws.amazon.com/AmazonRDS/latest/PostgreSQLReleaseNotes/postgresql-release-calendar.html" target="_blank" rel="noopener">RDS for PostgreSQL release calendar</a></li>
+      <li><a href="https://docs.aws.amazon.com/AmazonRDS/latest/AuroraPostgreSQLReleaseNotes/aurorapostgresql-release-calendar.html" target="_blank" rel="noopener">Aurora PostgreSQL release calendar</a></li>
+      <li><a href="https://docs.aws.amazon.com/en_us/AmazonRDS/latest/UserGuide/MySQL.Concepts.VersionMgmt.html" target="_blank" rel="noopener">RDS for MySQL versions</a></li>
+      <li><a href="https://docs.aws.amazon.com/AmazonRDS/latest/AuroraMySQLReleaseNotes/AuroraMySQL.release-calendars.html" target="_blank" rel="noopener">Aurora MySQL release calendar</a></li>
+      <li><a href="https://aws.amazon.com/blogs/aws-cloud-financial-management/estimating-the-charges-for-amazon-rds-extended-support" target="_blank" rel="noopener">AWS: Estimating the charges for Amazon RDS Extended Support</a></li>
+      <li><a href="https://aws.amazon.com/rds/postgresql/pricing/" target="_blank" rel="noopener">AWS: RDS for PostgreSQL pricing</a>, <a href="https://aws.amazon.com/rds/mysql/pricing/" target="_blank" rel="noopener">RDS for MySQL pricing</a>, <a href="https://aws.amazon.com/rds/aurora/pricing/" target="_blank" rel="noopener">Aurora pricing</a></li>
+      <li><a href="https://www.vantage.sh/blog/amazon-rds-extended-support" target="_blank" rel="noopener">Vantage: Extended Support rates by region</a></li>
+    </ul>
+  </footer>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  // Year 1-2 and year 3 rates, USD per vCPU-hour, provisioned instances.
+  // eu-central-1 verified against the AWS Price List (AmazonRDS offer, 2026-11-12); others are estimates.
+  const REGIONS = [
+    ["us-east-1", "US East (N. Virginia)", 0.100, 0.200],
+    ["us-east-2", "US East (Ohio)", 0.100, 0.200],
+    ["us-west-2", "US West (Oregon)", 0.100, 0.200],
+    ["ca-central-1", "Canada (Central)", 0.108, 0.216],
+    ["eu-central-1", "Europe (Frankfurt)", 0.122, 0.244],
+    ["eu-west-1", "Europe (Ireland)", 0.112, 0.224],
+    ["eu-west-2", "Europe (London)", 0.118, 0.235],
+    ["eu-west-3", "Europe (Paris)", 0.118, 0.235],
+    ["eu-south-1", "Europe (Milan)", 0.118, 0.235],
+    ["eu-south-2", "Europe (Spain)", 0.112, 0.224],
+    ["eu-north-1", "Europe (Stockholm)", 0.103, 0.206],
+    ["eu-central-2", "Europe (Zurich)", 0.134, 0.269],
+    ["ap-south-1", "Asia Pacific (Mumbai)", 0.114, 0.228],
+    ["ap-southeast-1", "Asia Pacific (Singapore)", 0.120, 0.240],
+    ["ap-southeast-2", "Asia Pacific (Sydney)", 0.120, 0.240],
+    ["ap-northeast-1", "Asia Pacific (Tokyo)", 0.120, 0.240],
+    ["sa-east-1", "South America (São Paulo)", 0.210, 0.419]
+  ].map(([id, name, r1, r3]) => ({ id, name, r1, r3 }));
+
+  // y1: Extended Support year-1 pricing starts; y3: year-3 pricing starts (null = never); end: Extended Support ends.
+  const ENGINES = {
+    "rds-pg": { label: "RDS for PostgreSQL", aurora: false, family: "pg", versions: {
+      "11": { y1: "2024-04-01", y3: "2026-04-01", end: "2027-03-31" },
+      "12": { y1: "2025-03-01", y3: "2027-03-01", end: "2028-02-29" },
+      "13": { y1: "2026-03-01", y3: "2028-03-01", end: "2029-02-28" },
+      "14": { y1: "2027-03-01", y3: "2029-03-01", end: "2030-02-28" },
+      "15": { y1: "2028-03-01", y3: "2030-03-01", end: "2031-02-28" },
+      "16": { y1: "2029-03-01", y3: "2031-03-01", end: "2032-02-29" },
+      "17": { y1: "2030-03-01", y3: "2032-03-01", end: "2033-02-28" }
+    }},
+    "aurora-pg": { label: "Aurora PostgreSQL", aurora: true, family: "pg", versions: {
+      "11": { y1: "2024-04-01", y3: "2026-04-01", end: "2027-03-31" },
+      "12": { y1: "2025-03-01", y3: "2027-03-01", end: "2028-02-29" },
+      "13": { y1: "2026-03-01", y3: "2028-03-01", end: "2029-02-28" },
+      "14": { y1: "2027-03-01", y3: "2029-03-01", end: "2030-02-28" },
+      "15": { y1: "2028-03-01", y3: "2030-03-01", end: "2031-02-28" },
+      "16": { y1: "2029-03-01", y3: "2031-03-01", end: "2032-02-29" },
+      "17": { y1: "2030-03-01", y3: "2032-03-01", end: "2033-02-28" }
+    }},
+    "rds-mysql": { label: "RDS for MySQL", aurora: false, family: "mysql", versions: {
+      "5.7": { y1: "2024-03-01", y3: "2026-03-01", end: "2029-06-30" },
+      "8.0": { y1: "2026-08-01", y3: "2028-08-01", end: "2029-07-31" },
+      "8.4": { y1: "2029-08-01", y3: "2031-08-01", end: "2032-07-31" }
+    }},
+    "aurora-mysql": { label: "Aurora MySQL", aurora: true, family: "mysql", versions: {
+      "2 (MySQL 5.7)": { y1: "2024-12-01", y3: "2026-12-01", end: "2029-06-30" },
+      "3 (MySQL 8.0)": { y1: "2028-05-01", y3: null, end: "2029-07-31" }
+    }}
+  };
+
+  const VCPU = [
+    [2, "2 vCPU · large / t-class"], [4, "4 vCPU · xlarge"], [8, "8 vCPU · 2xlarge"], [16, "16 vCPU · 4xlarge"],
+    [32, "32 vCPU · 8xlarge"], [48, "48 vCPU · 12xlarge"], [64, "64 vCPU · 16xlarge"], [96, "96 vCPU · 24xlarge"]
+  ];
+
+  const TOPO_RDS = [["1", "Single-AZ (1 node)"], ["2", "Multi-AZ (+ standby)"], ["3", "Multi-AZ cluster (3 nodes)"]];
+
+  const EXAMPLES = [
+    { name: "orders-db (example)", engine: "rds-pg", version: "14", region: "eu-central-1", vcpu: 16, topo: "2", replicas: 1 },
+    { name: "legacy-crm (example)", engine: "rds-mysql", version: "8.0", region: "eu-central-1", vcpu: 8, topo: "1", replicas: 0 }
+  ];
+
+  const DAY = 86400000;
+  const toDay = s => Math.floor(Date.parse(s + "T00:00:00Z") / DAY);
+  const now = new Date();
+  const TODAY = Math.floor(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) / DAY);
+  const fmtUSD = n => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(Math.round(n));
+  const fmtDate = s => { const d = new Date(Date.parse(s + "T00:00:00Z")); return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }); };
+
+  let rows = load() || EXAMPLES.map(r => ({ ...r }));
+
+  function load() {
+    try { const v = JSON.parse(localStorage.getItem("es-calc-rows") || "null"); return Array.isArray(v) && v.length ? v : null; } catch (e) { return null; }
+  }
+  function save() { try { localStorage.setItem("es-calc-rows", JSON.stringify(rows)); } catch (e) {} }
+
+  function nodes(r) {
+    const eng = ENGINES[r.engine];
+    const base = eng.aurora ? 1 : Number(r.topo || 1);
+    return base + Math.max(0, Number(r.replicas) || 0);
+  }
+  function region(r) { return REGIONS.find(x => x.id === r.region) || REGIONS[0]; }
+  function cal(r) { return ENGINES[r.engine].versions[r.version]; }
+
+  // Rate in USD per vCPU-hour on a given day number; null after Extended Support ends.
+  function rateOn(day, c, reg) {
+    if (day < toDay(c.y1)) return 0;
+    if (day > toDay(c.end)) return null;
+    if (c.y3 && day >= toDay(c.y3)) return reg.r3;
+    return reg.r1;
+  }
+
+  function phase(r) {
+    const c = cal(r), reg = region(r);
+    if (TODAY < toDay(c.y1)) return { cls: "ok", text: "Standard support", detail: "Charges start " + fmtDate(c.y1) };
+    if (TODAY > toDay(c.end)) return { cls: "crit", text: "Support ended", detail: "AWS upgrades it automatically" };
+    const r3 = c.y3 && TODAY >= toDay(c.y3);
+    return { cls: r3 ? "crit" : "warn", text: r3 ? "Extended Support · year 3+" : "Extended Support · year 1–2", detail: (c.y3 && !r3) ? "Rate doubles " + fmtDate(c.y3) : "Ends " + fmtDate(c.end) };
+  }
+
+  function compute() {
+    const perYear = {};
+    let monthNow = 0, next12 = 0, total = 0, vcpus = 0;
+    let firstFuture = null;
+    for (const r of rows) {
+      const c = cal(r), reg = region(r), v = Number(r.vcpu) * nodes(r);
+      const endDay = toDay(c.end);
+      const rn = rateOn(TODAY, c, reg);
+      if (rn) { monthNow += v * rn * 730; vcpus += v; }
+      if (!rn && TODAY < toDay(c.y1)) {
+        const startMonthly = v * reg.r1 * 730;
+        if (!firstFuture || toDay(c.y1) < firstFuture.day) firstFuture = { day: toDay(c.y1), date: c.y1, monthly: startMonthly, name: r.name };
+      }
+      for (let d = TODAY; d <= endDay; d++) {
+        const rt = rateOn(d, c, reg);
+        if (!rt) continue;
+        const cost = v * rt * 24;
+        total += cost;
+        if (d < TODAY + 365) next12 += cost;
+        const y = new Date(d * DAY).getUTCFullYear();
+        perYear[y] = perYear[y] || { a: 0, b: 0 };
+        if (rt === reg.r1) perYear[y].a += cost; else perYear[y].b += cost;
+      }
+    }
+    return { monthNow, next12, total, vcpus, perYear, firstFuture };
+  }
+
+  const el = id => document.getElementById(id);
+  const esc = s => String(s).replace(/[&<>"]/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[ch]));
+
+  function options(list, sel) { return list.map(([v, t]) => `<option value="${esc(v)}"${String(v) === String(sel) ? " selected" : ""}>${esc(t)}</option>`).join(""); }
+
+  function renderRows() {
+    const host = el("rows");
+    host.innerHTML = rows.map((r, i) => {
+      const eng = ENGINES[r.engine];
+      const vers = Object.keys(eng.versions);
+      if (!eng.versions[r.version]) r.version = vers[0];
+      const topo = eng.aurora
+        ? `<label>Cluster<select id="topo-${i}" disabled><option>Aurora cluster (writer)</option></select></label>`
+        : `<label>Deployment<select id="topo-${i}" data-k="topo" data-i="${i}">${options(TOPO_RDS, r.topo)}</select></label>`;
+      return `<div class="row">
+        <div class="row-fields">
+          <label>Name<input id="name-${i}" data-k="name" data-i="${i}" value="${esc(r.name)}"></label>
+          <label>Engine<select id="engine-${i}" data-k="engine" data-i="${i}">${options(Object.entries(ENGINES).map(([k, e]) => [k, e.label]), r.engine)}</select></label>
+          <label>Major version<select id="version-${i}" data-k="version" data-i="${i}">${options(vers.map(v => [v, v]), r.version)}</select></label>
+          <label>Region<select id="region-${i}" data-k="region" data-i="${i}">${options(REGIONS.map(x => [x.id, x.name]), r.region)}</select></label>
+        </div>
+        <div class="row-fields2">
+          <label>Instance size<select id="vcpu-${i}" data-k="vcpu" data-i="${i}">${options(VCPU, r.vcpu)}</select></label>
+          ${topo}
+          <label>${eng.aurora ? "Readers" : "Read replicas"}<input id="replicas-${i}" type="number" min="0" max="15" step="1" data-k="replicas" data-i="${i}" value="${Number(r.replicas) || 0}"></label>
+          <div></div>
+        </div>
+        <div class="row-foot">
+          <div class="row-stats" id="stats-${i}"></div>
+          <button class="btn-quiet" type="button" data-remove="${i}">Remove</button>
+        </div>
+      </div>`;
+    }).join("");
+  }
+
+  function renderStats() {
+    rows.forEach((r, i) => {
+      const box = el("stats-" + i); if (!box) return;
+      const c = cal(r), reg = region(r), v = Number(r.vcpu) * nodes(r), p = phase(r);
+      const rt = rateOn(TODAY, c, reg);
+      const monthly = rt ? v * rt * 730 : 0;
+      box.innerHTML = `<span class="pill ${p.cls}">${esc(p.text)}</span>
+        <span>${esc(p.detail)}</span>
+        <span><b>${nodes(r)}</b> ${nodes(r) === 1 ? "node" : "nodes"} · <b>${v}</b> billed vCPU</span>
+        <span>now <b>${fmtUSD(monthly)}</b>/mo</span>`;
+    });
+  }
+
+  function renderSummary() {
+    const s = compute();
+    el("now").textContent = fmtUSD(s.monthNow);
+    el("now").style.color = s.monthNow > 0 ? "var(--rate3)" : "var(--ok)";
+    if (s.monthNow > 0) {
+      el("now-sub").textContent = "That is " + fmtUSD(s.monthNow * 12) + " a year for versions AWS no longer supports as standard.";
+    } else if (s.firstFuture) {
+      el("now-sub").textContent = "Nothing yet. From " + fmtDate(s.firstFuture.date) + " you start paying about " + fmtUSD(s.firstFuture.monthly) + " a month.";
+    } else {
+      el("now-sub").textContent = "None of these versions is in Extended Support.";
+    }
+    el("next12").textContent = fmtUSD(s.next12);
+    el("total").textContent = fmtUSD(s.total);
+    el("vcpus").textContent = String(s.vcpus);
+    renderChart(s.perYear);
+    const hint = el("example-hint");
+    hint.hidden = !rows.some(r => /\(example\)/.test(r.name));
+  }
+
+  function niceStep(max) {
+    const raw = max / 4, mag = Math.pow(10, Math.floor(Math.log10(raw || 1)));
+    const f = raw / mag;
+    return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * mag;
+  }
+  function short(n) { return n >= 1e6 ? "$" + (n / 1e6).toFixed(n >= 1e7 ? 0 : 1) + "M" : n >= 1e3 ? "$" + Math.round(n / 1e3) + "k" : "$" + Math.round(n); }
+
+  function renderChart(perYear) {
+    const years = Object.keys(perYear).map(Number).sort((a, b) => a - b);
+    const box = el("chart");
+    if (!years.length) { box.innerHTML = `<p class="hint">No Extended Support charges for these versions.</p>`; return; }
+    const W = 320, H = 200, L = 44, R = 8, T = 12, B = 28;
+    const max = Math.max(...years.map(y => perYear[y].a + perYear[y].b));
+    const step = niceStep(max), top = Math.ceil(max / step) * step;
+    const y = v => T + (H - T - B) * (1 - v / top);
+    const bw = Math.min(36, (W - L - R) / years.length * 0.6);
+    const x = i => L + (W - L - R) * (i + 0.5) / years.length;
+    let g = "";
+    for (let v = 0; v <= top + 1e-9; v += step) {
+      g += `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)" stroke-width="1"/>`;
+      g += `<text x="${L - 6}" y="${y(v) + 4}" text-anchor="end" font-size="10" fill="var(--muted)" font-family="var(--font-data)">${short(v)}</text>`;
+    }
+    years.forEach((yr, i) => {
+      const a = perYear[yr].a, b = perYear[yr].b, cx = x(i);
+      g += `<rect x="${cx - bw / 2}" y="${y(a)}" width="${bw}" height="${Math.max(0, y(0) - y(a))}" fill="var(--rate1)"><title>${yr}: ${fmtUSD(a)} at years 1–2 rate</title></rect>`;
+      g += `<rect x="${cx - bw / 2}" y="${y(a + b)}" width="${bw}" height="${Math.max(0, y(a) - y(a + b))}" fill="var(--rate3)"><title>${yr}: ${fmtUSD(b)} at year 3+ rate</title></rect>`;
+      g += `<text x="${cx}" y="${H - 10}" text-anchor="middle" font-size="10.5" fill="var(--muted)" font-family="var(--font-data)">${yr === years[0] && yr === new Date(TODAY * DAY).getUTCFullYear() ? yr + "*" : yr}</text>`;
+    });
+    box.innerHTML = `<svg viewBox="0 0 ${W} ${H}" aria-hidden="true">${g}</svg>
+      <p class="hint">${years[0] === new Date(TODAY * DAY).getUTCFullYear() ? "* " + years[0] + " counts from today only." : ""}</p>`;
+  }
+
+  const NOTES = {
+    "pg-old": { title: "PostgreSQL 11–14 → 17 or 18", items: [
+      "<b>Statistics.</b> Before PostgreSQL 18, a major upgrade drops planner statistics. Run <code>ANALYZE</code> on every database right after the upgrade, or plans will be poor until autovacuum catches up. Upgrading to 18 keeps most statistics; extended statistics still need <code>ANALYZE</code>.",
+      "<b>Extensions.</b> Update PostGIS, pg_repack and other extensions to versions the target supports before you start. The RDS precheck fails otherwise.",
+      "<b>Logical replication slots.</b> Drop them before an RDS major upgrade from versions below 17, and recreate subscribers afterwards.",
+      "<b>Passwords.</b> PostgreSQL 14 made <code>scram-sha-256</code> the default password encryption. Old client drivers can fail to log in once passwords are reset.",
+      "<b>Public schema.</b> PostgreSQL 15 removed CREATE on <code>public</code> for all users in new databases. Scripts that create objects there may fail in fresh environments.",
+      "<b>Query plans.</b> The planner changes between major versions. Run your most frequent and most expensive queries on a restored snapshot of the new version and compare timings before you switch."
+    ]},
+    "pg-new": { title: "PostgreSQL 15–17 → newer major", items: [
+      "<b>Extensions.</b> Update extensions to versions the target supports before you start.",
+      "<b>Statistics.</b> Run <code>ANALYZE</code> after the upgrade unless the target is 18 or later.",
+      "<b>Query plans.</b> Compare your top queries on a restored snapshot of the new version before you switch."
+    ]},
+    "mysql57": { title: "MySQL 5.7 → 8.0", items: [
+      "<b>Reserved words.</b> 8.0 adds reserved words such as <code>RANK</code>, <code>GROUPS</code> and <code>LEAD</code>. Unquoted table or column names with those names break.",
+      "<b>GROUP BY no longer sorts.</b> Queries that relied on implicit ordering need an explicit <code>ORDER BY</code>.",
+      "<b>Query cache removed.</b> Workloads that leaned on it get slower until queries or indexes are tuned.",
+      "<b>Character set.</b> The default becomes <code>utf8mb4</code> with a new collation; compare sorting and index sizes.",
+      "<b>Renamed variables.</b> For example <code>tx_isolation</code> became <code>transaction_isolation</code>; application settings that use old names fail.",
+      "<b>Optimizer.</b> Plans change. Test your top queries on a restored snapshot before you switch."
+    ]},
+    "mysql80": { title: "MySQL 8.0 → 8.4", items: [
+      "<b>Authentication.</b> <code>mysql_native_password</code> is deprecated and no longer enabled by default in 8.4, and <code>default_authentication_plugin</code> is gone. Check users and drivers that still rely on it.",
+      "<b>Replication syntax.</b> <code>SHOW MASTER STATUS</code> and <code>CHANGE MASTER</code> are removed; tools and scripts must use the <code>BINARY LOG</code> and <code>REPLICATION SOURCE</code> forms.",
+      "<b>Changed InnoDB defaults.</b> Several defaults changed, including the adaptive hash index, which is now off. Workloads can get faster or slower.",
+      "<b>Foreign keys.</b> Foreign keys that reference non-unique or partial keys are rejected by default.",
+      "<b>Query plans.</b> Test your top queries on a restored snapshot before you switch."
+    ]}
+  };
+
+  function noteKey(r) {
+    const eng = ENGINES[r.engine];
+    if (eng.family === "pg") return Number(r.version) <= 14 ? "pg-old" : "pg-new";
+    if (r.version.startsWith("5.7") || r.version.startsWith("2")) return "mysql57";
+    return "mysql80";
+  }
+
+  function renderNotes() {
+    const keys = [...new Set(rows.map(noteKey))];
+    el("notes").innerHTML = keys.map(k => {
+      const n = NOTES[k];
+      const who = rows.filter(r => noteKey(r) === k).map(r => esc(r.name)).join(", ");
+      return `<article class="note"><div class="path">${esc(n.title)}</div><h3>${who}</h3><ul>${n.items.map(t => `<li>${t}</li>`).join("")}</ul></article>`;
+    }).join("") || `<p class="hint">Add a database to see upgrade notes.</p>`;
+  }
+
+  function renderAll() { renderRows(); renderStats(); renderSummary(); renderNotes(); save(); }
+  function refresh() { renderStats(); renderSummary(); renderNotes(); save(); }
+
+  document.addEventListener("input", e => {
+    const t = e.target, k = t.dataset && t.dataset.k; if (!k) return;
+    const r = rows[Number(t.dataset.i)]; if (!r) return;
+    if (k === "vcpu" || k === "replicas") r[k] = Number(t.value) || 0; else r[k] = t.value;
+    if (k === "engine") { r.version = Object.keys(ENGINES[r.engine].versions)[0]; renderAll(); return; }
+    refresh();
+  });
+  document.addEventListener("click", e => {
+    const rm = e.target.closest("[data-remove]");
+    if (rm) { rows.splice(Number(rm.dataset.remove), 1); renderAll(); }
+  });
+  el("add").addEventListener("click", () => {
+    rows.push({ name: "database-" + (rows.length + 1), engine: "rds-pg", version: "13", region: "eu-central-1", vcpu: 4, topo: "1", replicas: 0 });
+    renderAll();
+  });
+  el("reset").addEventListener("click", () => { rows = EXAMPLES.map(r => ({ ...r })); renderAll(); });
+
+  renderAll();
+})();
+</script>
+
+</body>
+</html>

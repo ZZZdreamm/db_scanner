@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "eol-scan"
+version = "0.1.0"
+description = "Find Amazon RDS and Aurora databases that cost extra in Extended Support, and what to check before upgrading."
+readme = "README.md"
+requires-python = ">=3.9"
+license = "MIT"
+license-files = ["LICENSE"]
+dependencies = ["boto3>=1.28"]
+
+[project.optional-dependencies]
+pg = ["psycopg[binary]>=3.1"]
+test = ["pytest>=7", "moto[rds,ec2]>=5"]
+
+[project.scripts]
+eol-scan = "eol_scan.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
