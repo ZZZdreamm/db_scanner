@@ -1,0 +1,295 @@
+{
+ "_source": "AWS RDS DescribeDBMajorEngineVersions, eu-central-1, fetched 2026-11-13. Public data.",
+ "lifecycles": [
+  {
+   "engine": "aurora-mysql",
+   "major": "5.7",
+   "support": {
+    "open-source-rds-standard-support": [
+     "2018-02-06",
+     "2024-10-31"
+    ],
+    "open-source-rds-extended-support": [
+     "2024-11-01",
+     "2029-06-30"
+    ]
+   }
+  },
+  {
+   "engine": "aurora-mysql",
+   "major": "8.0",
+   "support": {
+    "open-source-rds-standard-support": [
+     "2021-11-18",
+     "2028-04-30"
+    ],
+    "open-source-rds-extended-support": [
+     "2028-05-01",
+     "2029-07-31"
+    ]
+   }
+  },
+  {
+   "engine": "aurora-mysql",
+   "major": "8.4",
+   "support": {}
+  },
+  {
+   "engine": "aurora-postgresql",
+   "major": "11",
+   "support": {
+    "open-source-rds-standard-support": [
+     "2019-11-26",
+     "2024-02-29"
+    ],
+    "open-source-rds-extended-support": [
+     "2024-03-01",
+     "2027-03-31"
+    ]
+   }
+  },
+  {
+   "engine": "aurora-postgresql",
+   "major": "12",
+   "support": {
+    "open-source-rds-standard-support": [
+     "2020-12-23",
+     "2025-02-28"
+    ],
+    "open-source-rds-extended-support": [
+     "2025-03-01",
+     "2028-02-29"
+    ]
+   }
+  },
+  {
+   "engine": "aurora-postgresql",
+   "major": "13",
+   "support": {
+    "open-source-rds-standard-support": [
+     "2021-08-26",
+     "2026-02-28"
+    ],
+    "open-source-rds-extended-support": [
+     "2026-03-01",
+     "2029-02-28"
+    ]
+   }
+  },
+  {
+   "engine": "aurora-postgresql",
+   "major": "14",
+   "support": {
+    "open-source-rds-standard-support": [
+     "2022-03-10",
+     "2027-02-28"
+    ],
+    "open-source-rds-extended-support": [
+     "2027-03-01",
+     "2030-02-28"
+    ]
+   }
+  },
+  {
+   "engine": "aurora-postgresql",
+   "major": "15",
+   "support": {
+    "open-source-rds-standard-support": [
+     "2023-02-08",
+     "2028-02-29"
+    ],
+    "open-source-rds-extended-support": [
+     "2028-03-01",
+     "2031-02-28"
+    ]
+   }
+  },
+  {
+   "engine": "aurora-postgresql",
+   "major": "16",
+   "support": {
+    "open-source-rds-standard-support": [
+     "2024-01-31",
+     "2029-02-28"
+    ],
+    "open-source-rds-extended-support": [
+     "2029-03-01",
+     "2032-02-29"
+    ]
+   }
+  },
+  {
+   "engine": "aurora-postgresql",
+   "major": "17",
+   "support": {
+    "open-source-rds-standard-support": [
+     "2025-05-01",
+     "2030-02-28"
+    ],
+    "open-source-rds-extended-support": [
+     "2030-03-01",
+     "2033-02-28"
+    ]
+   }
+  },
+  {
+   "engine": "aurora-postgresql",
+   "major": "18",
+   "support": {}
+  },
+  {
+   "engine": "mysql",
+   "major": "5.7",
+   "support": {
+    "open-source-rds-standard-support": [
+     "2016-02-22",
+     "2024-02-29"
+    ],
+    "open-source-rds-extended-support": [
+     "2024-03-01",
+     "2029-06-30"
+    ]
+   }
+  },
+  {
+   "engine": "mysql",
+   "major": "8.0",
+   "support": {
+    "open-source-rds-standard-support": [
+     "2018-10-23",
+     "2026-07-31"
+    ],
+    "open-source-rds-extended-support": [
+     "2026-08-01",
+     "2029-07-31"
+    ]
+   }
+  },
+  {
+   "engine": "mysql",
+   "major": "8.4",
+   "support": {
+    "open-source-rds-standard-support": [
+     "2024-11-21",
+     "2029-07-31"
+    ],
+    "open-source-rds-extended-support": [
+     "2029-08-01",
+     "2032-07-31"
+    ]
+   }
+  },
+  {
+   "engine": "postgres",
+   "major": "11",
+   "support": {
+    "open-source-rds-standard-support": [
+     "2019-03-13",
+     "2024-02-29"
+    ],
+    "open-source-rds-extended-support": [
+     "2024-03-01",
+     "2027-03-31"
+    ]
+   }
+  },
+  {
+   "engine": "postgres",
+   "major": "12",
+   "support": {
+    "open-source-rds-standard-support": [
+     "2020-03-31",
+     "2025-02-28"
+    ],
+    "open-source-rds-extended-support": [
+     "2025-03-01",
+     "2028-02-29"
+    ]
+   }
+  },
+  {
+   "engine": "postgres",
+   "major": "13",
+   "support": {
+    "open-source-rds-standard-support": [
+     "2021-02-24",
+     "2026-02-28"
+    ],
+    "open-source-rds-extended-support": [
+     "2026-03-01",
+     "2029-02-28"
+    ]
+   }
+  },
+  {
+   "engine": "postgres",
+   "major": "14",
+   "support": {
+    "open-source-rds-standard-support": [
+     "2022-02-03",
+     "2027-02-28"
+    ],
+    "open-source-rds-extended-support": [
+     "2027-03-01",
+     "2030-02-28"
+    ]
+   }
+  },
+  {
+   "engine": "postgres",
+   "major": "15",
+   "support": {
+    "open-source-rds-standard-support": [
+     "2023-02-27",
+     "2028-02-29"
+    ],
+    "open-source-rds-extended-support": [
+     "2028-03-01",
+     "2031-02-28"
+    ]
+   }
+  },
+  {
+   "engine": "postgres",
+   "major": "16",
+   "support": {
+    "open-source-rds-standard-support": [
+     "2023-11-17",
+     "2029-02-28"
+    ],
+    "open-source-rds-extended-support": [
+     "2029-03-01",
+     "2032-02-29"
+    ]
+   }
+  },
+  {
+   "engine": "postgres",
+   "major": "17",
+   "support": {
+    "open-source-rds-standard-support": [
+     "2024-11-14",
+     "2030-02-28"
+    ],
+    "open-source-rds-extended-support": [
+     "2030-03-01",
+     "2033-02-28"
+    ]
+   }
+  },
+  {
+   "engine": "postgres",
+   "major": "18",
+   "support": {
+    "open-source-rds-standard-support": [
+     "2025-11-14",
+     "2031-02-28"
+    ],
+    "open-source-rds-extended-support": [
+     "2031-03-01",
+     "2034-02-28"
+    ]
+   }
+  }
+ ]
+}
