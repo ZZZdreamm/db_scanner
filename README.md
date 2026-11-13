@@ -36,6 +36,7 @@ The repository also contains `site/`, a one-page Extended Support calculator tha
 ```
 pip install .            # from this folder
 pip install '.[pg]'      # also enables the in-database PostgreSQL checks
+pip install '.[mysql]'   # also enables the in-database MySQL checks
 ```
 
 ## Use
@@ -62,6 +63,21 @@ The session is set to read-only. It reports:
 - installed extensions and their versions,
 - the 20 queries with the highest total time from `pg_stat_statements`, as the list to test on the new version.
 
+### In-database checks (MySQL)
+
+```
+eol-scan --mysql-dsn "mysql://readonly:password@mydb.xxxx.eu-central-1.rds.amazonaws.com:3306/app" --format html -o report.html
+```
+
+The session is set to read-only. For the next major version (5.7 → 8.0, 8.0 → 8.4) it reports:
+
+- tables, columns and routines named after words that become reserved (`rank`, `groups`, `rows`, `system`, `qualify`, …),
+- partitioned tables not on InnoDB, which stop 8.0 from starting,
+- utf8mb3 columns and zero-date defaults,
+- foreign keys that do not reference a whole PRIMARY/UNIQUE key (8.4 refuses new ones),
+- accounts on `mysql_native_password`, disabled by default in community 8.4,
+- the 20 statements with the highest total time from `performance_schema`, flagging `GROUP BY` without `ORDER BY` (5.7 sorted it, 8.0 does not).
+
 ## Permissions
 
 Read-only. The minimum IAM policy:
@@ -83,15 +99,16 @@ Nothing is sent anywhere. The tool only calls the AWS API with your credentials 
 | --- | --- |
 | RDS for PostgreSQL, Aurora PostgreSQL | 11 to 18 |
 | RDS for MySQL | 5.7, 8.0, 8.4 |
-| Aurora MySQL | version 2 (5.7), version 3 (8.0) |
+| Aurora MySQL | version 2 (5.7), version 3 (8.0), 8.4-compatible (standard support until April 2032, Extended Support dates not announced) |
 
-Not covered yet: SQL Server, Oracle, MariaDB, Aurora Serverless v2 (billed per ACU-hour), RDS on Outposts.
+
+SQL Server, Oracle, Db2, MariaDB, RDS Custom, DocumentDB and Neptune have no RDS Extended Support charge and are listed as `engine not covered`. Aurora Serverless v2 instances are flagged but not priced (billed per ACU-hour). Databases created with Extended Support disabled (`open-source-rds-extended-support-disabled`) are shown as such and cost nothing: AWS upgrades them at the end of standard support.
 
 ## Accuracy
 
 - Dates come from the AWS release calendars for each engine.
 - Regional rates come from a published summary of the AWS price list and may have changed. Confirm on the AWS pricing page for your engine before you quote a number.
-- vCPUs are derived from the instance size (`large` = 2, `xlarge` = 4, `2xlarge` = 8, …). Unusual classes show as `unknown size`.
+- vCPUs are derived from the instance size (`large` = 2, `xlarge` = 4, `2xlarge` = 8, …, with the 1-vCPU exceptions `db.t2.micro/small` and Graviton `.medium`). The tests check this against every class AWS offers for PostgreSQL, MySQL, MariaDB and Aurora (EC2 vCPU counts, November 2026). Optimize CPU classes show as `unknown size`.
 - Costs assume nodes run 24/7 at on-demand Extended Support rates.
 
 ## Develop

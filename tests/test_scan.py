@@ -91,3 +91,61 @@ def test_scan_with_mocked_aws(tmp_path, capsys):
     assert main(["--regions", "eu-central-1", "--as-of", "2026-11-12"]) == 0
     table = capsys.readouterr().out
     assert "Paying now" in table and "$712 / month" in table
+
+
+def test_extended_support_disabled_is_never_billed():
+    # AWS: a DB that opted out is upgraded automatically at the end of standard support.
+    f = evaluate({"DBInstanceIdentifier": "optout", "Engine": "postgres", "EngineVersion": "14.12",
+                  "DBInstanceClass": "db.r6g.4xlarge", "MultiAZ": True,
+                  "EngineLifecycleSupport": "open-source-rds-extended-support-disabled"}, "eu-central-1", TODAY)
+    assert f.status == "es-disabled"
+    assert f.monthly_now == f.next_12_months == f.until_end == 0
+    g = evaluate({"DBInstanceIdentifier": "optin", "Engine": "postgres", "EngineVersion": "14.12",
+                  "DBInstanceClass": "db.r6g.4xlarge", "MultiAZ": True,
+                  "EngineLifecycleSupport": "open-source-rds-extended-support"}, "eu-central-1", TODAY)
+    assert g.next_12_months > 0
+
+
+def test_serverless_v2_is_flagged_not_priced():
+    f = evaluate({"DBInstanceIdentifier": "sls", "Engine": "aurora-postgresql", "EngineVersion": "13.12",
+                  "DBInstanceClass": "db.serverless", "DBClusterIdentifier": "c"}, "eu-central-1", TODAY)
+    assert f.status == "serverless" and f.monthly_now == 0
+
+
+def test_aurora_and_multi_az_cluster_members_count_once_each():
+    # Aurora writer and readers, and the 3 instances of an RDS Multi-AZ DB cluster, are listed one by one.
+    for engine, version in (("aurora-mysql", "5.7.mysql_aurora.2.12.4"), ("postgres", "13.23-rds.20260819")):
+        f = evaluate({"DBInstanceIdentifier": "m", "Engine": engine, "EngineVersion": version,
+                      "DBInstanceClass": "db.r6gd.xlarge", "MultiAZ": True, "DBClusterIdentifier": "c"},
+                     "eu-central-1", TODAY)
+        assert f.nodes == 1 and f.billed_vcpu == 4
+        assert f.monthly_now == pytest.approx(4 * 0.122 * 730)
+
+
+def test_rds_version_suffixes():
+    assert major_version("postgres", "13.23-rds.20260819") == "13"
+    assert major_version("postgres", "12.22-rds.20260820") == "12"
+    assert major_version("aurora-postgresql", "16.4-limitless") == "16"
+    assert major_version("postgres", "") is None
+
+
+@mock_aws
+def test_scan_mixed_fleet_with_mocked_aws():
+    session = boto3.Session(region_name="eu-central-1")
+    rds = session.client("rds")
+    common = dict(AllocatedStorage=20, MasterUsername="admin", MasterUserPassword="password123")
+    rds.create_db_instance(DBInstanceIdentifier="pg13", Engine="postgres", EngineVersion="13.23",
+                           DBInstanceClass="db.t4g.medium", **common)
+    rds.create_db_instance(DBInstanceIdentifier="maria", Engine="mariadb", EngineVersion="10.11.9",
+                           DBInstanceClass="db.t3.micro", **common)
+    rds.create_db_instance(DBInstanceIdentifier="mssql", Engine="sqlserver-ex", EngineVersion="15.00.4415.2.v1",
+                           DBInstanceClass="db.t3.small", **common)
+    rds.create_db_instance(DBInstanceIdentifier="old57", Engine="mysql", EngineVersion="5.7.44",
+                           DBInstanceClass="db.t2.small", **common)
+    findings, errors = scan(session, ["eu-central-1"], TODAY)
+    assert not errors
+    by_id = {f.identifier: f for f in findings}
+    assert by_id["maria"].status == by_id["mssql"].status == "not-covered"
+    assert by_id["pg13"].monthly_now == pytest.approx(2 * 0.122 * 730)
+    assert by_id["old57"].billed_vcpu == 1
+    assert by_id["old57"].monthly_now == pytest.approx(1 * 0.244 * 730)

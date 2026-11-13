@@ -6,4 +6,3 @@ build/
 dist/
 report*.html
 report*.json
-lab/upgrade-test/results/

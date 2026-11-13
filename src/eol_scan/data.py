@@ -34,6 +34,8 @@ CALENDAR = {
     "aurora-mysql": {
         "2": {"y1": "2024-12-01", "y3": "2026-12-01", "end": "2029-06-30"},
         "3": {"y1": "2028-05-01", "y3": None, "end": "2029-07-31"},
+        # Standard support until April 2032; Extended Support dates "to be determined" by AWS.
+        "8.4": {"y1": None, "y3": None, "end": None},
     },
 }
 
@@ -67,12 +69,24 @@ RATES = {
 }
 DEFAULT_RATE = (0.100, 0.200)
 
+# Major versions older than the calendar: support has ended, AWS upgraded them.
+ENDED = {
+    "postgres": {"9.3", "9.4", "9.5", "9.6", "10"},
+    "aurora-postgresql": {"9.6", "10"},
+    "mysql": {"5.5", "5.6"},
+    "aurora-mysql": {"1"},
+}
+
 # Instance size suffix -> vCPU. Covers the standard db.* families.
 SIZE_VCPU = {
     "micro": 2, "small": 2, "medium": 2, "large": 2,
     "xlarge": 4, "2xlarge": 8, "4xlarge": 16, "8xlarge": 32,
     "12xlarge": 48, "16xlarge": 64, "24xlarge": 96, "32xlarge": 128, "48xlarge": 192,
 }
+# Small sizes that break the pattern (checked against EC2 DescribeInstanceTypes):
+# burstable t2 has 1 vCPU up to small, Graviton .medium of m/c/r families has 1.
+SMALL_VCPU_T2 = {"micro": 1, "small": 1, "medium": 2}
+SMALL_VCPU_NON_BURSTABLE = {"medium": 1}
 
 UPGRADE_NOTES = {
     "pg-old": [
@@ -103,4 +117,14 @@ UPGRADE_NOTES = {
         "Foreign keys on non-unique or partial keys are rejected by default.",
         "Compare your top queries on a restored snapshot before switching.",
     ],
+}
+
+# Words that become reserved in the target MySQL version, so unquoted identifiers with these
+# names stop parsing. Taken from INFORMATION_SCHEMA.KEYWORDS (RESERVED = 1) on 8.0.46 and 8.4.13,
+# keeping only words that 5.7.44 (resp. 8.0.46) still accepts as a column name (checked 2026-11-12).
+MYSQL_NEW_RESERVED = {
+    "8.0": {"CUBE", "CUME_DIST", "DENSE_RANK", "EMPTY", "EXCEPT", "FIRST_VALUE", "FUNCTION", "GROUPING", "GROUPS",
+            "INTERSECT", "JSON_TABLE", "LAG", "LAST_VALUE", "LATERAL", "LEAD", "NTH_VALUE", "NTILE", "OF", "OVER",
+            "PERCENT_RANK", "RANK", "RECURSIVE", "ROW", "ROWS", "ROW_NUMBER", "SYSTEM", "WINDOW"},
+    "8.4": {"QUALIFY", "TABLESAMPLE"},
 }

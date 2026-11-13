@@ -15,6 +15,8 @@ STATUS_LABEL = {
     "not-covered": "engine not covered",
     "unknown-version": "unknown version",
     "unknown-size": "unknown size",
+    "serverless": "Serverless v2 (per ACU-hour, not estimated)",
+    "es-disabled": "Extended Support disabled: auto-upgrade",
 }
 
 
@@ -25,7 +27,7 @@ def usd(n: float) -> str:
 def _relevant(findings: list[Finding], show_all: bool) -> list[Finding]:
     if show_all:
         return findings
-    return [f for f in findings if f.monthly_now > 0 or f.next_12_months > 0 or f.status in ("ended", "unknown-size", "unknown-version")]
+    return [f for f in findings if f.monthly_now > 0 or f.next_12_months > 0 or f.status in ("ended", "unknown-size", "unknown-version", "serverless", "es-disabled")]
 
 
 def to_table(findings: list[Finding], summary: dict, today: date, show_all: bool = False) -> str:
@@ -61,7 +63,24 @@ def to_json(findings: list[Finding], summary: dict, today: date, errors: list[st
                        "databases": [f.to_dict() for f in findings]}, indent=2)
 
 
-def to_html(findings: list[Finding], summary: dict, today: date, errors: list[str], pg: dict | None = None) -> str:
+def _checks_html(title: str, chk: dict | None) -> str:
+    if not chk:
+        return ""
+    e = html.escape
+    items = "".join(f"<li class='bad'>{e(b)}</li>" for b in chk.get("blockers", []))
+    items += "".join(f"<li>{e(w)}</li>" for w in chk.get("warnings", []))
+    exts = ", ".join(f"{x['name']} {x['version']}" for x in chk.get("extensions", []))
+    q = "".join(f"<tr><td class='n'>{x['calls']:,}</td><td class='n'>{x['mean_ms']}</td><td><code>{e(x['query'])}</code></td></tr>"
+                for x in chk.get("top_queries", []))
+    target = f", upgrade to {e(chk['target'])}" if chk.get("target") else ""
+    return (f"<h2>Database checks ({title} {e(chk.get('server_version', '?'))}{target})</h2>"
+            f"<ul>{items or '<li>No upgrade blockers found.</li>'}</ul>"
+            + (f"<p><b>Extensions:</b> {e(exts)}</p>" if exts else "")
+            + (f"<h3>Queries to test on the new version</h3><table><tr><th>Calls</th><th>Mean ms</th><th>Query</th></tr>{q}</table>" if q else ""))
+
+
+def to_html(findings: list[Finding], summary: dict, today: date, errors: list[str], pg: dict | None = None,
+            my: dict | None = None) -> str:
     e = html.escape
     rows = sorted(_relevant(findings, False), key=lambda f: (-f.monthly_now, -f.next_12_months))
     trs = "".join(
@@ -80,16 +99,7 @@ def to_html(findings: list[Finding], summary: dict, today: date, errors: list[st
         f"<section class='note'><h3>{e(k)}</h3><ul>{''.join(f'<li>{e(n)}</li>' for n in v)}</ul></section>"
         for k, v in notes.items()
     )
-    pg_html = ""
-    if pg:
-        items = "".join(f"<li class='bad'>{e(b)}</li>" for b in pg.get("blockers", []))
-        items += "".join(f"<li>{e(w)}</li>" for w in pg.get("warnings", []))
-        exts = ", ".join(f"{x['name']} {x['version']}" for x in pg.get("extensions", []))
-        q = "".join(f"<tr><td class='n'>{x['calls']:,}</td><td class='n'>{x['mean_ms']}</td><td><code>{e(x['query'])}</code></td></tr>"
-                    for x in pg.get("top_queries", []))
-        pg_html = (f"<h2>Database checks (PostgreSQL {e(pg.get('server_version', '?'))})</h2>"
-                   f"<ul>{items or '<li>No upgrade blockers found.</li>'}</ul><p><b>Extensions:</b> {e(exts) or 'none'}</p>"
-                   + (f"<h3>Queries to test on the new version</h3><table><tr><th>Calls</th><th>Mean ms</th><th>Query</th></tr>{q}</table>" if q else ""))
+    pg_html = _checks_html("PostgreSQL", pg) + _checks_html("MySQL", my)
     err_html = "".join(f"<li>{e(x)}</li>" for x in errors)
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Extended Support scan {today.isoformat()}</title><style>

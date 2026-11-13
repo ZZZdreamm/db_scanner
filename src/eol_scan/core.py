@@ -5,7 +5,10 @@ import re
 from dataclasses import dataclass, field, asdict
 from datetime import date, timedelta
 
-from .data import CALENDAR, DEFAULT_RATE, RATES, SIZE_VCPU, TARGET, UPGRADE_NOTES
+from .data import (CALENDAR, DEFAULT_RATE, ENDED, RATES, SIZE_VCPU, SMALL_VCPU_NON_BURSTABLE, SMALL_VCPU_T2,
+                   TARGET, UPGRADE_NOTES)
+
+ES_DISABLED = "open-source-rds-extended-support-disabled"
 
 HOURS_PER_MONTH = 730
 
@@ -15,6 +18,8 @@ def major_version(engine: str, version: str) -> str | None:
     if not version:
         return None
     if engine == "aurora-mysql":
+        if version.startswith("8.4"):
+            return "8.4"
         m = re.search(r"mysql_aurora\.(\d+)", version)
         if m:
             return m.group(1)
@@ -26,8 +31,10 @@ def major_version(engine: str, version: str) -> str | None:
             return "3"
         return None
     if engine in ("postgres", "aurora-postgresql"):
-        parts = version.split(".")
-        return parts[0] if int(parts[0]) >= 10 else ".".join(parts[:2])
+        m = re.match(r"(\d+)(?:\.(\d+))?", version)
+        if not m:
+            return None
+        return m.group(1) if int(m.group(1)) >= 10 else f"{m.group(1)}.{m.group(2)}"
     if engine == "mysql":
         m = re.match(r"(\d+\.\d+)", version)
         return m.group(1) if m else None
@@ -38,8 +45,14 @@ def vcpu_for_class(instance_class: str) -> int | None:
     """db.r6g.4xlarge -> 16. Returns None for serverless or unknown classes."""
     if not instance_class or instance_class == "db.serverless":
         return None
-    size = instance_class.rsplit(".", 1)[-1]
-    size = size.split("-")[0]  # e.g. db.r5.large-tpc2.mem2x isn't standard; keep base
+    parts = instance_class.split(".")
+    if len(parts) != 3:  # e.g. db.r5.large.tpc2.mem2x (Optimize CPU) or db.r7i.metal-48xl
+        return None
+    _, family, size = parts
+    if family.startswith("t2") and size in SMALL_VCPU_T2:
+        return SMALL_VCPU_T2[size]
+    if not family.startswith("t") and size in SMALL_VCPU_NON_BURSTABLE:
+        return SMALL_VCPU_NON_BURSTABLE[size]
     return SIZE_VCPU.get(size)
 
 
@@ -70,7 +83,8 @@ class Finding:
     vcpu_per_node: int | None
     nodes: int
     billed_vcpu: int
-    status: str            # standard | extended-y1-2 | extended-y3 | ended | not-covered | unknown-size
+    status: str            # standard | extended-y1-2 | extended-y3 | ended | es-disabled | not-covered
+                           # | unknown-version | unknown-size | serverless
     monthly_now: float = 0.0
     next_12_months: float = 0.0
     until_end: float = 0.0
@@ -119,18 +133,24 @@ def evaluate(db: dict, region: str, today: date) -> Finding:
         return f
     cal = CALENDAR[engine].get(major or "")
     if cal is None:
-        f.status = "ended" if major in ("9.6", "10", "1", "5.6") else "unknown-version"
+        f.status = "ended" if major in ENDED.get(engine, ()) else "unknown-version"
+        return f
+    if cal["y1"] is None:  # standard support, Extended Support dates not announced yet
         return f
     f.charges_start, f.rate_doubles, f.support_ends = cal["y1"], cal.get("y3"), cal["end"]
     f.target = TARGET.get(engine)
     f.notes = UPGRADE_NOTES[notes_key(engine, major)]
+    if f.lifecycle == ES_DISABLED:
+        # Opted out of Extended Support: never billed, AWS upgrades it at the end of standard support.
+        f.status = "es-disabled"
+        return f
     if vcpu is None:
-        f.status = "unknown-size"
+        f.status = "serverless" if klass == "db.serverless" else "unknown-size"
     now_rate = rate_on(today, cal, region)
     if now_rate is None:
         f.status = "ended"
         return f
-    if f.status != "unknown-size":
+    if f.status not in ("unknown-size", "serverless"):
         if now_rate == 0:
             f.status = "standard"
         elif cal.get("y3") and today >= _d(cal["y3"]):

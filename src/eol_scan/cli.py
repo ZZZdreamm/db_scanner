@@ -20,6 +20,8 @@ def parse_args(argv=None):
     p.add_argument("--all", action="store_true", help="list every database, not only the ones that cost extra")
     p.add_argument("--as-of", help="evaluate as if today were YYYY-MM-DD (what-if)")
     p.add_argument("--pg-dsn", help="also run read-only upgrade checks inside this PostgreSQL database")
+    p.add_argument("--mysql-dsn", help="also run read-only upgrade checks inside this MySQL server, "
+                                       "e.g. mysql://user:password@host:3306/dbname")
     p.add_argument("--version", action="version", version=f"eol-scan {__version__}")
     return p.parse_args(argv)
 
@@ -48,25 +50,35 @@ def main(argv=None) -> int:
     if args.pg_dsn:
         from .pgcheck import check_postgres
         pg = check_postgres(args.pg_dsn)
+    my = None
+    if args.mysql_dsn:
+        from .mysqlcheck import check_mysql
+        my = check_mysql(args.mysql_dsn)
 
     if args.format == "json":
         text = to_json(findings, summary, today, errors)
         if pg:
             import json
             d = json.loads(text); d["postgres_checks"] = pg; text = json.dumps(d, indent=2)
+        if my:
+            import json
+            d = json.loads(text); d["mysql_checks"] = my; text = json.dumps(d, indent=2)
     elif args.format == "html":
-        text = to_html(findings, summary, today, errors, pg)
+        text = to_html(findings, summary, today, errors, pg, my)
     else:
         text = to_table(findings, summary, today, show_all=args.all)
-        if pg:
-            text += "\n\nPostgreSQL checks (" + pg.get("server_version", "?") + "):\n"
-            for b in pg["blockers"]:
+        for title, chk in (("PostgreSQL", pg), ("MySQL", my)):
+            if not chk:
+                continue
+            target = f", upgrade to {chk['target']}" if chk.get("target") else ""
+            text += f"\n\n{title} checks ({chk.get('server_version', '?')}{target}):\n"
+            for b in chk["blockers"]:
                 text += f"  BLOCKER  {b}\n"
-            for w in pg["warnings"]:
+            for w in chk["warnings"]:
                 text += f"  note     {w}\n"
-            if not pg["blockers"]:
+            if not chk["blockers"]:
                 text += "  No upgrade blockers found.\n"
-            for q in pg.get("top_queries", [])[:10]:
+            for q in chk.get("top_queries", [])[:10]:
                 text += f"  {q['calls']:>10,} calls  {q['mean_ms']:>9} ms  {q['query'][:90]}\n"
         for err in errors:
             text += f"\nwarning: could not read {err}"

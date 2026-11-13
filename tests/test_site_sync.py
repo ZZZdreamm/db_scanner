@@ -21,7 +21,9 @@ def _site_versions(key):
 
 def test_calendars_match():
     for site_key, engine in ENGINE_MAP.items():
-        assert _site_versions(site_key) == CALENDAR[engine], site_key
+        # Versions whose Extended Support dates AWS has not announced have nothing to calculate.
+        dated = {v: c for v, c in CALENDAR[engine].items() if c["y1"]}
+        assert _site_versions(site_key) == dated, site_key
 
 
 def test_postgres_18_on_page():

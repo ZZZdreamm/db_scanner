@@ -14,6 +14,7 @@ dependencies = ["boto3>=1.28"]
 
 [project.optional-dependencies]
 pg = ["psycopg[binary]>=3.1"]
+mysql = ["PyMySQL>=1.1"]
 test = ["pytest>=7", "moto[rds,ec2]>=5"]
 
 [project.scripts]

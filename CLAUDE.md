@@ -22,5 +22,5 @@ Two things in one repo, both aimed at teams paying AWS RDS/Aurora Extended Suppo
 
 ## Repositories
 
-- `origin` is private and holds everything, including `lab/` (local upgrade labs, the paid part in the making).
-- `public` serves the calculator on GitHub Pages. Publish only with `scripts/publish-public.sh`, which strips `lab/`. Never `git push public`.
+- This folder is the PUBLIC repo `ZZZdreamm/db_scanner` (remote `origin`); it serves the calculator on GitHub Pages. Nothing private goes here.
+- The upgrade labs (the paid part in the making) live in the private repo `ZZZdreamm/db_scanner-private`, checked out at `../db_scanner-lab`. It installs this repo editable, so changes to `eol_scan` belong here.
