@@ -1,6 +1,8 @@
 """Optional read-only checks inside one PostgreSQL database (needs psycopg)."""
 from __future__ import annotations
 
+POLYMORPHIC_CHANGED_IN_14 = ("array_append", "array_prepend", "array_cat", "array_position", "array_positions",
+                             "array_remove", "array_replace", "width_bucket")
 REG_BLOCKERS = ("regcollation", "regconfig", "regdictionary", "regnamespace",
                 "regoper", "regoperator", "regproc", "regprocedure")
 
@@ -39,6 +41,25 @@ def check_postgres(dsn: str, top: int = 20) -> dict:
         )
         for nsp, rel, col, typ in cur.fetchall():
             out["blockers"].append(f"Column {nsp}.{rel}.{col} uses {typ}, which pg_upgrade cannot carry over")
+
+        if num < 140000:
+            # 14 changed these to anycompatible; user aggregates/operators built on the old signatures
+            # make pg_upgrade --check fail ("incompatible polymorphic functions").
+            cur.execute(
+                """/* eol-scan */ SELECT 'aggregate ' || a.aggfnoid::regprocedure::text
+                   FROM pg_aggregate a JOIN pg_proc p ON p.oid = a.aggfnoid
+                   JOIN pg_proc f ON f.oid IN (a.aggtransfn, a.aggfinalfn)
+                   WHERE p.pronamespace NOT IN ('pg_catalog'::regnamespace, 'information_schema'::regnamespace)
+                     AND f.pronamespace = 'pg_catalog'::regnamespace AND f.proname = ANY(%s)
+                   UNION
+                   SELECT 'operator ' || o.oid::regoperator::text FROM pg_operator o JOIN pg_proc f ON f.oid = o.oprcode
+                   WHERE o.oprnamespace NOT IN ('pg_catalog'::regnamespace, 'information_schema'::regnamespace)
+                     AND f.pronamespace = 'pg_catalog'::regnamespace AND f.proname = ANY(%s)""",
+                (list(POLYMORPHIC_CHANGED_IN_14), list(POLYMORPHIC_CHANGED_IN_14)),
+            )
+            for (obj,) in cur.fetchall():
+                out["blockers"].append(f"User-defined {obj} is built on a function PostgreSQL 14 changed to anycompatible; "
+                                       "pg_upgrade to 14+ refuses to run. Drop it before and recreate it after the upgrade")
 
         cur.execute("/* eol-scan */ SELECT 1 FROM pg_extension WHERE extname = 'pg_stat_statements'")
         if cur.fetchone():
